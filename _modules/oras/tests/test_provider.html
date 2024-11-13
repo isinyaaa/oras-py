@@ -46,7 +46,7 @@
   <link href="../../../_static/custom.css?v=d68d0989" rel="stylesheet" type="text/css"/>
   <script src="../../../_static/documentation_options.js?v=0e525676">
   </script>
-  <script src="../../../_static/doctools.js?v=9a2dae69">
+  <script src="../../../_static/doctools.js?v=9bcbadda">
   </script>
   <script src="../../../_static/sphinx_highlight.js?v=dc90522c">
   </script>
@@ -298,6 +298,7 @@
 <span class="n">__license__</span> <span class="o">=</span> <span class="s2">"Apache-2.0"</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">import</span> <span class="nn">pytest</span>
@@ -308,7 +309,7 @@
 <span class="kn">import</span> <span class="nn">oras.provider</span>
 <span class="kn">import</span> <span class="nn">oras.utils</span>
 
-<span class="n">here</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+<span class="n">here</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span>
 
 
 <div class="viewcode-block" id="test_annotated_registry_push">
@@ -360,6 +361,125 @@
 
 
 
+<div class="viewcode-block" id="test_file_contains_column">
+<a class="viewcode-back" href="../../../source/oras.tests.html#oras.tests.test_provider.test_file_contains_column">[docs]</a>
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">with_auth</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">test_file_contains_column</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="n">registry</span><span class="p">,</span> <span class="n">credentials</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Test for file containing column symbol</span>
+<span class="sd">    """</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">oras</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">OrasClient</span><span class="p">(</span><span class="n">hostname</span><span class="o">=</span><span class="n">registry</span><span class="p">,</span> <span class="n">insecure</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">here</span><span class="p">,</span> <span class="s2">"artifact.txt"</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
+
+    <span class="c1"># file containing `:`</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">contains_column</span> <span class="o">=</span> <span class="n">here</span> <span class="o">/</span> <span class="s2">"some:file"</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">contains_column</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"hello world some:file"</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="n">contains_column</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="mi">201</span><span class="p">]</span>
+
+        <span class="n">files</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">pull</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download"</span><span class="p">)</span>
+        <span class="n">download</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download/some:file"</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">download</span> <span class="ow">in</span> <span class="n">files</span>
+        <span class="k">assert</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">contains_column</span><span class="p">)</span>
+        <span class="p">)</span> <span class="o">==</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span><span class="n">download</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">contains_column</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="c1"># file containing `:` as prefix, pushed with type</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">contains_column</span> <span class="o">=</span> <span class="n">here</span> <span class="o">/</span> <span class="s2">":somefile"</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">contains_column</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"hello world :somefile"</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">contains_column</span><span class="si">}</span><span class="s2">:text/plain"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="mi">201</span><span class="p">]</span>
+
+        <span class="n">files</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">pull</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download"</span><span class="p">)</span>
+        <span class="n">download</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download/:somefile"</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">download</span> <span class="ow">in</span> <span class="n">files</span>
+        <span class="k">assert</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">contains_column</span><span class="p">)</span>
+        <span class="p">)</span> <span class="o">==</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span><span class="n">download</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">contains_column</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="c1"># error: file does not exist</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">):</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">".doesnotexist"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">):</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">":doesnotexist"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">match</span><span class="o">=</span><span class="sa">r</span><span class="s2">".*does:not:exists .*"</span><span class="p">):</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">"does:not:exists:text/plain"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">match</span><span class="o">=</span><span class="sa">r</span><span class="s2">".*does:not:exists .*"</span><span class="p">):</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">"does:not:exists:text/plain+ext"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="test_chunked_push">
+<a class="viewcode-back" href="../../../source/oras.tests.html#oras.tests.test_provider.test_chunked_push">[docs]</a>
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">with_auth</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">test_chunked_push</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="n">registry</span><span class="p">,</span> <span class="n">credentials</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Basic tests for oras chunked push</span>
+<span class="sd">    """</span>
+    <span class="c1"># Direct access to registry functions</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">oras</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">OrasClient</span><span class="p">(</span><span class="n">hostname</span><span class="o">=</span><span class="n">registry</span><span class="p">,</span> <span class="n">insecure</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">here</span><span class="p">,</span> <span class="s2">"artifact.txt"</span><span class="p">)</span>
+
+    <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
+
+    <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="n">artifact</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">do_chunked</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="mi">201</span><span class="p">,</span> <span class="mi">202</span><span class="p">]</span>
+
+    <span class="n">files</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">pull</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">tmp_path</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">str</span><span class="p">(</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"artifact.txt"</span><span class="p">)</span> <span class="ow">in</span> <span class="n">files</span>
+    <span class="k">assert</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span> <span class="o">==</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span><span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># large file upload</span>
+    <span class="n">base_size</span> <span class="o">=</span> <span class="n">oras</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">default_chunksize</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 16GB</span>
+    <span class="n">tmp_chunked</span> <span class="o">=</span> <span class="n">here</span> <span class="o">/</span> <span class="s2">"chunked"</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s2">"dd"</span><span class="p">,</span>
+                <span class="s2">"if=/dev/null"</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">"of=</span><span class="si">{</span><span class="n">tmp_chunked</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+                <span class="s2">"bs=1"</span><span class="p">,</span>
+                <span class="s2">"count=0"</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">"seek=</span><span class="si">{</span><span class="n">base_size</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+            <span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span>
+            <span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="n">tmp_chunked</span><span class="p">],</span>
+            <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span>
+            <span class="n">do_chunked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">assert</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="mi">201</span><span class="p">,</span> <span class="mi">202</span><span class="p">]</span>
+
+        <span class="n">files</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">pull</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download"</span><span class="p">)</span>
+        <span class="n">download</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"download/chunked"</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">download</span> <span class="ow">in</span> <span class="n">files</span>
+        <span class="k">assert</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">tmp_chunked</span><span class="p">))</span> <span class="o">==</span> <span class="n">oras</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_file_hash</span><span class="p">(</span>
+            <span class="n">download</span>
+        <span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">tmp_chunked</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+
+    <span class="c1"># File that doesn't exist</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="n">tmp_path</span> <span class="o">/</span> <span class="s2">"none"</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="test_parse_manifest">
 <a class="viewcode-back" href="../../../source/oras.tests.html#oras.tests.test_provider.test_parse_manifest">[docs]</a>
 <span class="k">def</span> <span class="nf">test_parse_manifest</span><span class="p">(</span><span class="n">registry</span><span class="p">):</span>
@@ -374,12 +494,6 @@
     <span class="n">ref</span><span class="p">,</span> <span class="n">content_type</span> <span class="o">=</span> <span class="n">remote</span><span class="o">.</span><span class="n">_parse_manifest_ref</span><span class="p">(</span><span class="n">testref</span><span class="p">)</span>
     <span class="k">assert</span> <span class="n">ref</span> <span class="o">==</span> <span class="s2">"path/to/config"</span>
     <span class="k">assert</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">"application/vnd.oci.image.config.v1+json"</span>
-
-    <span class="n">testref</span> <span class="o">=</span> <span class="s2">"path/to/config:application/vnd.oci.image.config.v1+json:extra"</span>
-    <span class="n">remote</span> <span class="o">=</span> <span class="n">oras</span><span class="o">.</span><span class="n">provider</span><span class="o">.</span><span class="n">Registry</span><span class="p">(</span><span class="n">hostname</span><span class="o">=</span><span class="n">registry</span><span class="p">,</span> <span class="n">insecure</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="n">ref</span><span class="p">,</span> <span class="n">content_type</span> <span class="o">=</span> <span class="n">remote</span><span class="o">.</span><span class="n">_parse_manifest_ref</span><span class="p">(</span><span class="n">testref</span><span class="p">)</span>
-    <span class="k">assert</span> <span class="n">ref</span> <span class="o">==</span> <span class="s2">"path/to/config"</span>
-    <span class="k">assert</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">"application/vnd.oci.image.config.v1+json:extra"</span>
 
     <span class="n">testref</span> <span class="o">=</span> <span class="s2">"/dev/null:application/vnd.oci.image.manifest.v1+json"</span>
     <span class="n">ref</span><span class="p">,</span> <span class="n">content_type</span> <span class="o">=</span> <span class="n">remote</span><span class="o">.</span><span class="n">_parse_manifest_ref</span><span class="p">(</span><span class="n">testref</span><span class="p">)</span>
@@ -456,13 +570,13 @@
        © Copyright 2023, Oras Python Developers.
       </div>
       Last updated on
-              Sep 02, 2024.
+              Nov 13, 2024.
       <br/>
       Created using
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      8.0.2.
+      8.1.3.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for
